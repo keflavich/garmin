@@ -1,4 +1,5 @@
 import xml.etree.cElementTree as ET
+from xml.dom import minidom
 import numpy as np
 
 def parse_garmin(filename, asarray=True):
@@ -14,27 +15,42 @@ def parse_garmin(filename, asarray=True):
     datadict = {
             'altitude':[],
             'distance':[],
+            'latitude':[],
+            'longitude':[],
             'time':[],
+            'hr_bpm':[],
             }
     dtypes = {
             'altitude':'float',
             'distance':'float',
+            'latitude':'float',
+            'longitude':'float',
             'time':'datetime64[s]',
+            'hr_bpm':'int',
             }
 
     for tp in trackpoints:
         try: 
             datadict['altitude'] += [float(tp.getElementsByTagName('AltitudeMeters')[0].childNodes[0].nodeValue)]
             datadict['distance'] += [float(tp.getElementsByTagName('DistanceMeters')[0].childNodes[0].nodeValue)]
+            datadict['longitude'] += [float(tp.getElementsByTagName('LongitudeDegrees')[0].childNodes[0].nodeValue)]
+            datadict['latitude'] += [float(tp.getElementsByTagName('LatitudeDegrees')[0].childNodes[0].nodeValue)]
             datadict['time']     += [(tp.getElementsByTagName('Time')[0].childNodes[0].nodeValue)]
+            if tp.getElementsByTagName('HeartRateBpm'):
+                datadict['hr_pbm'] += [(tp.getElementsByTagName('HeartRateBpm')[0].childNodes[0].nodeValue)]
         except IndexError:
             print "Skipped ",
-            print tp,tp.childNodes,[N.nodeValue for N in tp.childNodes if hasattr(N,'nodeValue')]
+            print tp,tp.childNodes,[N.nodeValue for N in tp.childNodes if
+                                    hasattr(N,'nodeValue')]
+
+    dt = np.array(datadict['time'], dtype='datetime64[s]') - np.datetime64(datadict['time'][0])
+    datadict['dt'] = dt.astype('float').tolist()
+    dtypes['dt'] = 'float'
 
     if asarray:
         keys = datadict.keys()
-        dataarr = np.array(zip(*[datadict[k] for k in keys]),
-                            dtype=[(k,dtypes[k]) for k in keys])
+        dataarr = np.array(zip(*[datadict[k] for k in keys if any(datadict[k])]),
+                            dtype=[(k,dtypes[k]) for k in keys if any(datadict[k])])
         return dataarr
 
     return datadict
